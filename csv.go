@@ -19,7 +19,7 @@ type Reader struct {
 func (r *Reader) Read() ([]string,error){
 	line:=[]string{}
 	is_r :=0
-
+	is_has:=0
 	for r.end<r.size{
 		switch r.buf[r.end] {
 		case '"':
@@ -33,20 +33,31 @@ func (r *Reader) Read() ([]string,error){
 				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-1]),"\"\"","\""))
 				r.cellStart=0 //列数据开始标识清空
 				r.cellEnd=1 //列数据已经获取完毕标识
+				is_has = 1
 			}else if r.cellStart==1{
-				line=append(line,string(r.buf[r.start:r.end]))
+				line=append(line,string(r.buf[r.start:r.end-is_r]))
 				r.cellStart=0 //列数据开始标识清空
 				r.cellEnd=1 //列数据已经获取完毕标识
+				is_has = 1
+			}else if r.cellStart==0{
+				line=append(line,"")
+				is_has = 1
 			}
 		case '\r':
 			is_r=1
 		case '\n'://可能是一行数据结束标识
 			if r.cellEnd==1{//列数据已经获取完毕，遇上了换行符，说明此行已结束
 				r.cellEnd=0
+				if is_has==1{
+					line=append(line,"")
+				}
 				return line,nil
 			}else if r.cellStart==1{ //如果这个列没有被双引号包含，则肯定此行已经结束
 				line=append(line,string(r.buf[r.start:r.end-is_r]))
 				r.cellStart=0 //列数据开始标识清空
+				if is_has==1{
+					line=append(line,"")
+				}
 				return line,nil
 			}
 		default:
@@ -55,9 +66,18 @@ func (r *Reader) Read() ([]string,error){
 				r.cellStart=1//无双引号包含
 				r.cellEnd =0 //列结束标识清空
 				r.start = r.end
+				is_has = 0
 			}
 		}
 		r.end++
+	}
+
+	if r.cellEnd>0{
+		r.cellEnd=0
+		if is_has==1{
+			line=append(line,"")
+		}
+		return line,nil
 	}
 
 	return nil,io.EOF
