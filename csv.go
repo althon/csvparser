@@ -72,13 +72,17 @@ func (r *Reader) Read() ([]string,error){
 		r.end++
 	}
 
-	if r.cellEnd>0{
-		r.cellEnd=0
-		if is_has==1{
-			line=append(line,"")
-		}
-		return line,nil
+	if len(line)>0{
+		line=append(line,string(r.buf[r.start:r.end]))
+		return line ,nil
 	}
+	//if r.cellEnd>0{
+	//	r.cellEnd=0
+	//	if is_has==1{
+	//		line=append(line,"")
+	//	}
+	//	return line,nil
+	//}
 
 	return nil,io.EOF
 }
