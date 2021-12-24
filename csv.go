@@ -59,6 +59,10 @@ func (r *Reader) Read() ([]string,error){
 					line=append(line,"")
 				}
 				return line,nil
+			}else if r.cellStart==2{//被双引号包含了
+				line=append(line,string(r.buf[r.start:r.end-is_r-1]))//-1是减掉结尾的引号
+				r.cellStart=0 //列数据开始标识清空
+				return line,nil
 			}
 		default:
 			//如果是双引号 同时是开始行标识
@@ -73,7 +77,13 @@ func (r *Reader) Read() ([]string,error){
 	}
 
 	if len(line)>0{
-		line=append(line,string(r.buf[r.start:r.end]))
+
+		if r.end-r.start>1{
+			line=append(line,string(r.buf[r.start:r.end]))
+		}else{
+			line=append(line,"")
+		}
+
 		return line ,nil
 	}
 	//if r.cellEnd>0{
