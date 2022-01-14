@@ -20,27 +20,56 @@ func (r *Reader) Read() ([]string,error){
 	line:=[]string{}
 	is_r :=0
 	is_has:=0
+	//quto_count:=0
 	for r.end<r.size{
 		switch r.buf[r.end] {
-		case '"':
+		case '"'://可能有双引号包含
 			if r.cellStart==0{
-				r.cellStart=2 //代表有双引号包含
+				if r.buf[r.end+1]=='"' && r.end+2<r.size && r.buf[r.end+2]=='"'{//首尾有双引号包含,且该片段也有双引号
+					r.cellStart=2
+				}else if r.buf[r.end+1]=='"'{//首尾无双引号包含
+					r.cellStart=1
+				}else{//首尾有双引号包含
+					r.cellStart=2
+				}
+				r.start = r.end +1
 				r.cellEnd =0 //列结束标识清空
-				r.start = r.end+1
+			}else{
+				//if r.buf[r.end-1]=='"' { //内容里面可能也有双引号
+				//	if quto_count==0{ //说明此内容开头的N个字带有双引号,可能没有被双引号包含
+				//		quto_count=2
+				//	}else{
+				//		quto_count++
+				//	}
+				//}else{
+				//	quto_count++
+				//}
 			}
 		case ','://可能是列分隔符
-			if r.cellStart==2 && r.buf[r.end-1]=='"'{ //是双引号包含 则【",】是列结束标识
-				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-1]),"\"\"","\""))
+			if r.cellStart==2 && r.buf[r.end-1]=='"' { //是双引号包含 则(",)是列结束标识
+				//分两种情况
+				//1 结尾有双引号 2结尾无双引号
+				if (r.buf[r.end-2]=='"' && r.buf[r.end-3]=='"') || (r.buf[r.end-2]!='"' && r.buf[r.end-3]!='"'){
+					line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-1]),"\"\"","\""))
+					r.cellStart=0 //列数据开始标识清空
+					r.cellEnd=1 //列数据已经获取完毕标识
+					//quto_count=0
+					is_has = 1
+				}
+
+			}else if r.cellStart==1{//前后无双引号包含
+				//结尾内容有双引号或没有双引号
+				if r.buf[r.end-1]!='"' || (r.buf[r.end-1]=='"' && r.buf[r.end-2]=='"') {
+
+				}
+				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r]),"\"\"","\""))
 				r.cellStart=0 //列数据开始标识清空
 				r.cellEnd=1 //列数据已经获取完毕标识
-				is_has = 1
-			}else if r.cellStart==1{
-				line=append(line,string(r.buf[r.start:r.end-is_r]))
-				r.cellStart=0 //列数据开始标识清空
-				r.cellEnd=1 //列数据已经获取完毕标识
+				//quto_count=0
 				is_has = 1
 			}else if r.cellStart==0{
 				line=append(line,"")
+				//quto_count=0
 				is_has = 1
 			}
 		case '\r':
@@ -53,18 +82,21 @@ func (r *Reader) Read() ([]string,error){
 				}
 				return line,nil
 			}else if r.cellStart==1{ //如果这个列没有被双引号包含，则肯定此行已经结束
-				line=append(line,string(r.buf[r.start:r.end-is_r]))
+				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r]),"\"\"","\"") )
 				r.cellStart=0 //列数据开始标识清空
 				if is_has==1{
 					line=append(line,"")
 				}
 				return line,nil
-			}else if r.cellStart==2{//被双引号包含了,可能已经过了第二个引号
-				if r.cellEnd!=0 || r.buf[r.end-1-is_r]=='"'{//单元格结束 或 前1个字符是引号（说明已经结束）
-					line=append(line,string(r.buf[r.start:r.end-is_r-1]))//-1是减掉结尾的引号
-					r.cellStart=0 //列数据开始标识清空
-					return line,nil
-				}
+			}else if r.cellStart==2 && r.buf[r.end-1-is_r]=='"'{//被双引号包含了,可能已经过了第二个引号
+				//if r.cellEnd!=0 || (r.buf[r.end-1-is_r]=='"' && quto_count<=1) {//单元格结束 或 前1个字符是引号（说明已经结束）
+				//	line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r-1]),"\"\"","\"") )//-1是减掉结尾的引号
+				//	r.cellStart=0 //列数据开始标识清空
+				//	return line,nil
+				//}
+				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r-1]),"\"\"","\"") )//-1是减掉结尾的引号
+				r.cellStart=0 //列数据开始标识清空
+				return line,nil
 			}
 		default:
 			//如果是双引号 同时是开始行标识
@@ -73,6 +105,8 @@ func (r *Reader) Read() ([]string,error){
 				r.cellEnd =0 //列结束标识清空
 				r.start = r.end
 				is_has = 0
+			}else{
+
 			}
 		}
 		r.end++
@@ -88,14 +122,6 @@ func (r *Reader) Read() ([]string,error){
 
 		return line ,nil
 	}
-	//if r.cellEnd>0{
-	//	r.cellEnd=0
-	//	if is_has==1{
-	//		line=append(line,"")
-	//	}
-	//	return line,nil
-	//}
-
 	return nil,io.EOF
 }
 
@@ -107,58 +133,3 @@ func NewReader(filename string)*Reader{
 	}
 	return &Reader{buf:buf,size: len(buf)}
 }
-
-//func parseCsv(file string) []string{
-//
-//	buf,err:=os.ReadFile(file)
-//	if err!=nil{
-//		fmt.Println("cannot open file:",file)
-//		return nil
-//	}
-//
-//	line:=[]string{}
-//	cell_start:=0
-//	cell_end:=0
-//	is_r :=0
-//	size:= len(buf)
-//	start,end:=0,0
-//	for end<size{
-//		switch buf[end] {
-//		case '"':
-//			if cell_start==0{
-//				cell_start=2 //代表有双引号包含
-//				cell_end =0 //列结束标识清空
-//				start = end+1
-//			}
-//		case ','://可能是列分隔符
-//			if cell_start==2 && buf[end-1]=='"'{ //是双引号包含 则【",】是列结束标识
-//				line=append(line,strings.ReplaceAll(l,"\"\"","\""))
-//				cell_start=0 //列数据开始标识清空
-//				cell_end=1 //列数据已经获取完毕标识
-//			}else if cell_start==1{
-//				line=append(line,string(buf[start:end]))
-//				cell_start=0 //列数据开始标识清空
-//				cell_end=1 //列数据已经获取完毕标识
-//			}
-//		case '\r':
-//			is_r=1
-//		case '\n'://可能是一行数据结束标识
-//			if cell_end==1{//列数据已经获取完毕，遇上了换行符，说明此行已结束
-//				cell_end=0
-//			}else if cell_start==1{ //如果这个列没有被双引号包含，则肯定此行已经结束
-//				line=append(line,string(buf[start:end-is_r]))
-//				cell_start=0 //列数据开始标识清空
-//			}
-//		default:
-//			//如果是双引号 同时是开始行标识
-//			if cell_start==0{
-//				cell_start=1//无双引号包含
-//				cell_end =0 //列结束标识清空
-//				start = end
-//			}
-//		}
-//		end++
-//	}
-//
-//	return line
-//}
