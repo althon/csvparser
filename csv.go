@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -131,5 +132,7 @@ func NewReader(filename string)*Reader{
 		fmt.Println("cannot open csv file:",filename)
 		return nil
 	}
+	//去掉bom
+	buf = bytes.TrimPrefix(buf,[]byte{239, 187, 191})
 	return &Reader{buf:buf,size: len(buf)}
 }
