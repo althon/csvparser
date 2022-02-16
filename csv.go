@@ -54,6 +54,7 @@ func (r *Reader) Read() ([]string,error){
 					line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-1]),"\"\"","\""))
 					r.cellStart=0 //列数据开始标识清空
 					r.cellEnd=1 //列数据已经获取完毕标识
+					r.start=0
 					//quto_count=0
 					is_has = 1
 				}
@@ -66,6 +67,7 @@ func (r *Reader) Read() ([]string,error){
 				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r]),"\"\"","\""))
 				r.cellStart=0 //列数据开始标识清空
 				r.cellEnd=1 //列数据已经获取完毕标识
+				r.start=0
 				//quto_count=0
 				is_has = 1
 			}else if r.cellStart==0{
@@ -85,18 +87,15 @@ func (r *Reader) Read() ([]string,error){
 			}else if r.cellStart==1{ //如果这个列没有被双引号包含，则肯定此行已经结束
 				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r]),"\"\"","\"") )
 				r.cellStart=0 //列数据开始标识清空
+				r.start=0
 				if is_has==1{
 					line=append(line,"")
 				}
 				return line,nil
 			}else if r.cellStart==2 && r.buf[r.end-1-is_r]=='"'{//被双引号包含了,可能已经过了第二个引号
-				//if r.cellEnd!=0 || (r.buf[r.end-1-is_r]=='"' && quto_count<=1) {//单元格结束 或 前1个字符是引号（说明已经结束）
-				//	line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r-1]),"\"\"","\"") )//-1是减掉结尾的引号
-				//	r.cellStart=0 //列数据开始标识清空
-				//	return line,nil
-				//}
 				line=append(line,strings.ReplaceAll(string(r.buf[r.start:r.end-is_r-1]),"\"\"","\"") )//-1是减掉结尾的引号
 				r.cellStart=0 //列数据开始标识清空
+				r.start=0
 				return line,nil
 			}
 		default:
@@ -106,16 +105,13 @@ func (r *Reader) Read() ([]string,error){
 				r.cellEnd =0 //列结束标识清空
 				r.start = r.end
 				is_has = 0
-			}else{
-
 			}
 		}
 		r.end++
 	}
 
 	if len(line)>0{
-
-		if r.end-r.start>1{
+		if r.start!=0 && r.end-r.start>1{
 			line=append(line,string(r.buf[r.start:r.end]))
 		}else{
 			line=append(line,"")
